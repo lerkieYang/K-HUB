@@ -1072,7 +1072,7 @@ async fn pull_gemini_sessions(db: &Database, config_dir: &PathBuf) -> (i32, Vec<
     
     let mut session_files = Vec::new();
     
-    // 遍历 tmp 下的用户目录 (e.g. tmp/lerki/chats/)
+    // 遍历 tmp 下的用户目录 (e.g. tmp/user/chats/)
     if let Ok(user_dirs) = std::fs::read_dir(&tmp_dir) {
         for user_entry in user_dirs.flatten() {
             let chats_dir = user_entry.path().join("chats");

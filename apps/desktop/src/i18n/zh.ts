@@ -443,7 +443,7 @@ export default {
   'settings.kb.title': '知识库目录',
   'settings.kb.description': '配置知识库目录，系统会自动索引目录中的文件。',
   'settings.kb.namePlaceholder': '名称（可选）',
-  'settings.kb.pathPlaceholder': '目录路径，如 C:\\Users\\lerki\\Documents\\knowledge',
+  'settings.kb.pathPlaceholder': '目录路径，如 C:\\Users\\user\\Documents\\knowledge',
   'settings.kb.browse': '📂 浏览...',
   'settings.kb.browseTitle': '选择文件夹',
   'settings.kb.adding': '添加中...',

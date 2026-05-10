@@ -22,10 +22,10 @@ cmd.exe /c "netstat -ano | findstr 8443"
 
 ```bash
 # 进入 hub-service 目录
-cd /mnt/c/Users/lerki/OneDrive/Desktop/knowledgeHUB/apps/hub-service
+cd /mnt/c/Users/user/OneDrive/Desktop/knowledgeHUB/apps/hub-service
 
 # 编译（如果还没有编译）
-/mnt/c/Users/lerki/.cargo/bin/cargo.exe build
+/mnt/c/Users/user/.cargo/bin/cargo.exe build
 
 # 运行
 DATABASE_URL="sqlite:./data/knowledge-hub.db" ./target/debug/hub-service.exe
@@ -56,7 +56,7 @@ curl http://127.0.0.1:8443/api/memory?limit=5
 1. 打开一个新的 PowerShell 或终端窗口
 2. 运行 hub-service：
    ```bash
-   cd C:\Users\lerki\OneDrive\Desktop\knowledgeHUB\apps\hub-service
+   cd C:\Users\user\OneDrive\Desktop\knowledgeHUB\apps\hub-service
    set DATABASE_URL=sqlite:./data/knowledge-hub.db
    .\target\debug\hub-service.exe
    ```

@@ -26,7 +26,7 @@ async fn test_standalone_mode_flow() {
     let data_source = client.post(format!("{}/api/data-sources", base_url))
         .json(&json!({
             "name": "Test Source",
-            "path": "C:\\Users\\lerki\\Documents",
+            "path": "C:\\Users\\user\\Documents",
             "source_type": "local"
         }))
         .send()

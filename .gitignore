@@ -39,3 +39,17 @@ config.local.json
 # Temp
 tmp/
 temp/
+
+# Debug/test scripts (development only)
+*.ps1
+apps/hub-service/check_*.py
+apps/hub-service/delete_*.py
+apps/hub-service/restore_*.py
+apps/hub-service/test_*.py
+apps/hub-service/add_*.py
+apps/hub-service/build_output.txt
+apps/hub-service/add_config.json
+
+# Files with embedded personal metadata
+*.pdf
+apps/desktop/public/*.png

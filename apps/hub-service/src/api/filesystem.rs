@@ -44,10 +44,10 @@ async fn list_roots() -> Json<Value> {
     
     // Windows 特殊文件夹 (Quick Access)
     let special_folders: Vec<(&str, &str)> = vec![
-        ("Desktop", "C:\\Users\\lerki\\Desktop"),
-        ("Documents", "C:\\Users\\lerki\\Documents"),
-        ("Downloads", "C:\\Users\\lerki\\Downloads"),
-        ("OneDrive", "C:\\Users\\lerki\\OneDrive"),
+        ("Desktop", "C:\\Users\\user\\Desktop"),
+        ("Documents", "C:\\Users\\user\\Documents"),
+        ("Downloads", "C:\\Users\\user\\Downloads"),
+        ("OneDrive", "C:\\Users\\user\\OneDrive"),
     ];
     for (name, path_str) in special_folders {
         if Path::new(path_str).exists() {
@@ -61,8 +61,8 @@ async fn list_roots() -> Json<Value> {
     
     // 云盘文件夹 (Cloud Storage)
     let cloud_folders: Vec<(&str, &str)> = vec![
-        ("WPS Cloud", "C:\\Users\\lerki\\WPS Cloud Files"),
-        ("Xiaomi Cloud", "C:\\Users\\lerki\\Xiaomi Cloud"),
+        ("WPS Cloud", "C:\\Users\\user\\WPS Cloud Files"),
+        ("Xiaomi Cloud", "C:\\Users\\user\\Xiaomi Cloud"),
     ];
     for (name, path_str) in cloud_folders {
         if Path::new(path_str).exists() {

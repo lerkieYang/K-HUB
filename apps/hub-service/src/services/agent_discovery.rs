@@ -113,7 +113,7 @@ impl AgentDiscovery {
         }
         
         // Also try native /home/* paths (works when hub-service runs in WSL)
-        let wsl_user_home = PathBuf::from("/home/lerekie");
+        let wsl_user_home = PathBuf::from("/home/user");
         if wsl_user_home.exists() && !home_dirs.iter().any(|(p, _)| p == &wsl_user_home) {
             home_dirs.push((wsl_user_home, "wsl".to_string()));
         }

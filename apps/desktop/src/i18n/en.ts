@@ -443,7 +443,7 @@ export default {
   'settings.kb.title': 'Knowledge Base Directories',
   'settings.kb.description': 'Configure knowledge base directories. The system will automatically index files in these directories.',
   'settings.kb.namePlaceholder': 'Name (optional)',
-  'settings.kb.pathPlaceholder': 'Directory path, e.g. C:\\Users\\lerki\\Documents\\knowledge',
+  'settings.kb.pathPlaceholder': 'Directory path, e.g. C:\\Users\\user\\Documents\\knowledge',
   'settings.kb.browse': '📂 Browse...',
   'settings.kb.browseTitle': 'Select Folder',
   'settings.kb.adding': 'Adding...',

@@ -780,7 +780,7 @@ EMBEDDING_MODEL = "text-embedding-3-small"
   "agent_id": "hermes",
   "display_name": "Hermes Agent",
   "permissions": ["context_read", "memory_candidate_write", "artifact_write"],
-  "output_dirs": ["C:/Users/lerki/.knowledge-hub/outputs/hermes"],
+  "output_dirs": ["C:/Users/user/.knowledge-hub/outputs/hermes"],
   "memory_policy": {
     "allow_candidate_submit": true,
     "default_scope": "project",
