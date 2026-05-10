@@ -1,0 +1,61 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://knowledge-hub.dev/schemas/context-request.json",
+  "title": "ContextRequest",
+  "description": "Schema for context retrieval requests",
+  "type": "object",
+  "required": ["query", "workspaceId", "deviceId"],
+  "properties": {
+    "query": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The context query string"
+    },
+    "workspaceId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Workspace to search within"
+    },
+    "deviceId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Device making the request"
+    },
+    "maxResults": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 100,
+      "default": 10,
+      "description": "Maximum number of results to return"
+    },
+    "filters": {
+      "type": "object",
+      "properties": {
+        "fileTypes": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "dateFrom": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "dateTo": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "source": {
+          "type": "string"
+        },
+        "minImportance": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    }
+  }
+}

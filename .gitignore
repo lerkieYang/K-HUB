@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+target/
+dist/
+
+# Build outputs
+*.exe
+*.dll
+*.so
+*.dylib
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Data
+data/
+*.sqlite
+*.db
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Config
+config.local.json
+
+# Temp
+tmp/
+temp/

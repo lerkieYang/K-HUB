@@ -1,0 +1,35 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://knowledge-hub.dev/schemas/device-registration.json",
+  "title": "DeviceRegistration",
+  "description": "Schema for device registration requests",
+  "type": "object",
+  "required": ["name", "type", "platform"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100,
+      "description": "User-friendly device name"
+    },
+    "type": {
+      "type": "string",
+      "enum": ["desktop", "laptop", "server", "mobile"],
+      "description": "Type of device"
+    },
+    "platform": {
+      "type": "string",
+      "enum": ["windows", "macos", "linux", "android", "ios"],
+      "description": "Operating system platform"
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "hostname": { "type": "string" },
+        "osVersion": { "type": "string" },
+        "appVersion": { "type": "string" },
+        "ipAddress": { "type": "string" }
+      }
+    }
+  }
+}

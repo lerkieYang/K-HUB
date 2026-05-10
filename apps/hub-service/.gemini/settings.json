@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "knowledge-hub": {
+      "command": "http://127.0.0.1:8443/mcp",
+      "args": []
+    }
+  }
+}

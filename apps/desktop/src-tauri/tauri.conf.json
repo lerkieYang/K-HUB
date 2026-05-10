@@ -1,0 +1,54 @@
+{
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build",
+    "devPath": "http://localhost:1420",
+    "distDir": "../dist"
+  },
+  "package": {
+    "productName": "K-HUB",
+    "version": "1.1.0"
+  },
+  "tauri": {
+    "allowlist": {
+      "all": false,
+      "shell": {
+        "open": true,
+        "sidecar": true
+      }
+    },
+    "bundle": {
+      "active": true,
+      "identifier": "com.knowledgehub.desktop",
+      "icon": [
+        "icons/icon.ico"
+      ],
+      "resources": [
+        "hub-service.exe"
+      ],
+      "targets": ["nsis", "msi"],
+      "windows": {
+        "nsis": {
+          "installMode": "currentUser",
+          "displayLanguageSelector": false
+        }
+      }
+    },
+    "security": {
+      "csp": null
+    },
+    "windows": [
+      {
+        "title": "K-HUB",
+        "width": 1200,
+        "height": 800,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "systemTray": {
+      "iconPath": "icons/icon.ico",
+      "iconAsTemplate": true
+    }
+  }
+}

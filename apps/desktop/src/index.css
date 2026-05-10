@@ -1,0 +1,18 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 防止页面切换时因滚动条出现/消失导致的闪烁和位移 */
+html {
+  scrollbar-gutter: stable;
+}
+
+/* 平滑页面过渡 */
+body {
+  overflow-y: scroll;
+}
+
+/* 减少页面切换时的布局抖动 */
+#root {
+  min-height: 100vh;
+}

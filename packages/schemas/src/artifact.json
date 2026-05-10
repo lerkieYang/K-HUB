@@ -1,0 +1,67 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://knowledge-hub.dev/schemas/artifact.json",
+  "title": "Artifact",
+  "description": "Schema for file artifacts stored in Knowledge Hub",
+  "type": "object",
+  "required": ["id", "fileName", "fileType", "fileSize", "sha256", "sourcePath", "deviceId", "workspaceId", "uploadedAt", "status"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique identifier for the artifact"
+    },
+    "fileName": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Original file name"
+    },
+    "fileType": {
+      "type": "string",
+      "description": "MIME type of the file"
+    },
+    "fileSize": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "File size in bytes"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "SHA-256 hash of the file content"
+    },
+    "sourcePath": {
+      "type": "string",
+      "description": "Original file path on the source device"
+    },
+    "deviceId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "ID of the device that uploaded the artifact"
+    },
+    "workspaceId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "ID of the workspace this artifact belongs to"
+    },
+    "uploadedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the artifact was uploaded"
+    },
+    "processedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the artifact processing completed"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["pending", "processing", "completed", "failed"],
+      "description": "Current processing status"
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Additional metadata about the artifact"
+    }
+  }
+}

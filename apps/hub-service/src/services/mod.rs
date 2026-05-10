@@ -1,0 +1,11 @@
+pub mod knowledge_indexer;
+pub mod agent_discovery;
+pub mod ai_service;
+pub mod doc_converter;
+pub mod memory_exporter;
+pub mod activity_collector;
+pub mod device_service;
+pub mod context_builder;
+pub mod vector_search;
+pub mod task_registry;
+pub mod file_watcher;
