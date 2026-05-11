@@ -1,6 +1,6 @@
 [package]
 name = "knowledgehub-desktop"
-version = "1.1.1"
+version = "1.1.2"
 description = "K-HUB Desktop Application"
 authors = ["K-HUB Team"]
 edition = "2021"
