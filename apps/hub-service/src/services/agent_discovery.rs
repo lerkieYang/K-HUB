@@ -95,8 +95,16 @@ impl AgentDiscovery {
         }
         
         // Try WSL paths via \\wsl.localhost\Ubuntu\home\* (accessible from Windows)
+        // Only probe WSL paths if WSL is actually installed (avoids triggering WSL install prompt)
+        // Check by looking for wsl.exe in System32 (no execution = no prompt)
+        let wsl_available = cfg!(target_os = "windows") && {
+            let wsl_exe = std::path::PathBuf::from(
+                std::env::var("SystemRoot").unwrap_or_else(|_| "C:\\Windows".to_string())
+            ).join("System32").join("wsl.exe");
+            wsl_exe.exists()
+        };
         let wsl_unc_prefix = PathBuf::from(r"\\wsl.localhost\Ubuntu\home");
-        if wsl_unc_prefix.exists() {
+        if wsl_available && wsl_unc_prefix.exists() {
             if let Ok(entries) = std::fs::read_dir(&wsl_unc_prefix) {
                 for entry in entries.flatten() {
                     let path = entry.path();
