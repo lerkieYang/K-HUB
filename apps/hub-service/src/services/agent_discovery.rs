@@ -166,7 +166,7 @@ impl AgentDiscovery {
                 self.check_agent(home_dir, env, AgentType::Codex, ".codex", "config.toml"),
                 self.check_agent(home_dir, env, AgentType::Gemini, ".gemini", "settings.json"),
                 self.check_agent(home_dir, env, AgentType::OpenClaw, ".openclaw", "openclaw.json"),
-                self.check_agent(home_dir, env, AgentType::OpenCode, ".opencode", "config.json"),
+                self.check_agent(home_dir, env, AgentType::OpenCode, ".config/opencode", "package.json"),
                 self.check_agent(home_dir, env, AgentType::ClaudeCode, ".claude", "settings.json"),
                 self.check_agent(home_dir, env, AgentType::Aider, ".aider", "config.yml"),
             ];
@@ -244,6 +244,15 @@ impl AgentDiscovery {
                 let memory_dir = config_dir.join("memory");
                 if memory_dir.exists() {
                     Some(memory_dir)
+                } else {
+                    Some(config_dir.clone())
+                }
+            },
+            AgentType::OpenCode => {
+                // OpenCode 用 XDG 目录: .local/share/opencode/opencode.db
+                let data_dir = home_dir.join(".local/share/opencode");
+                if data_dir.exists() {
+                    Some(data_dir)
                 } else {
                     Some(config_dir.clone())
                 }
@@ -386,7 +395,7 @@ impl AgentDiscovery {
                 AgentType::Codex => ".codex",
                 AgentType::Gemini => ".gemini",
                 AgentType::OpenClaw => ".openclaw",
-                AgentType::OpenCode => ".opencode",
+                AgentType::OpenCode => ".config/opencode",
                 AgentType::ClaudeCode => ".claude",
                 _ => continue,
             };
@@ -494,7 +503,7 @@ impl AgentDiscovery {
                 AgentType::Codex => ".codex",
                 AgentType::Gemini => ".gemini",
                 AgentType::OpenClaw => ".openclaw",
-                AgentType::OpenCode => ".opencode",
+                AgentType::OpenCode => ".config/opencode",
                 AgentType::ClaudeCode => ".claude",
                 _ => continue,
             };
