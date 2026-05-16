@@ -2,6 +2,8 @@ pub mod knowledge_indexer;
 pub mod agent_discovery;
 pub mod ai_service;
 pub mod doc_converter;
+pub mod content_cleaner;
+pub mod pdf_processor;
 pub mod memory_exporter;
 pub mod activity_collector;
 pub mod device_service;

@@ -53,3 +53,6 @@ apps/hub-service/add_config.json
 # Files with embedded personal metadata
 *.pdf
 apps/desktop/public/*.png
+build.bat
+apps/desktop/src-tauri/resources/tesseract/
+apps/desktop/src-tauri/resources/poppler/

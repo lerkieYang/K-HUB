@@ -67,6 +67,8 @@ pub fn routes() -> Router<Database> {
          .route("/api/knowledge/tasks/:id/stop", post(stop_task_handler))
          .route("/api/knowledge/tasks/:id/force-stop", post(force_stop_task_handler))
          .route("/api/knowledge/tasks/stop-all", post(stop_all_tasks_handler))
+         .route("/api/knowledge/reclean", post(reclean_all))
+         .route("/api/knowledge/tools", get(get_tools_status))
          .route("/api/data/clear", post(clear_all_data))
          .route("/api/data/stats", get(data_stats))
          .route("/api/data/cleanup-old-versions", post(cleanup_old_versions))
@@ -754,32 +756,37 @@ async fn get_progress(
 ) -> Json<Value> {
     // 先检查是否有运行中的任务（有实时进度）
     let active_progress = crate::services::task_registry::get_active_progress().await;
-    
+
     // 始终从数据库查询索引数据（不受向量化任务影响）
     let db_total: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM knowledge_ext WHERE is_current = 1"
     ).fetch_one(&db.pool).await.unwrap_or(0);
-    
+
     let db_indexed: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM doc WHERE type = 'knowledge' AND status = 'active'"
     ).fetch_one(&db.pool).await.unwrap_or(0);
-    
+
     let db_vectorized: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM doc WHERE type = 'knowledge' AND status = 'active' AND metadata IS NOT NULL AND metadata != '' AND metadata != '{}' AND metadata != '[]'"
     ).fetch_one(&db.pool).await.unwrap_or(0);
-    
-    let (stage, scan_count, total_files, indexed_count, vectorized_count, index_progress, vectorize_progress) = 
+
+    let (stage, scan_count, total_files, indexed_count, vectorized_count, index_progress, vectorize_progress) =
     if let Some((stage, scan, task_total, task_indexed, task_vectorized)) = active_progress {
-        // 索引进度始终用数据库值（不受向量化任务影响）
-        let idx_pct = if db_total > 0 { (db_indexed as f64 / db_total as f64 * 100.0).min(100.0) } else { 0.0 };
-        if stage == "vectorizing" || stage.starts_with("vectorizing") {
+        if stage == "indexing" || stage == "scanning" {
+            // 索引任务：用任务扫描的文件总数作为分母（不是数据库已有记录数）
+            let idx_pct = if task_total > 0 { (task_indexed as f64 / task_total as f64 * 100.0).min(100.0) } else { 0.0 };
+            let vec_pct = if db_total > 0 { (db_vectorized as f64 / db_total as f64 * 100.0).min(100.0) } else { 0.0 };
+            (stage, scan, task_total, task_indexed, db_vectorized, idx_pct, vec_pct)
+        } else if stage == "vectorizing" || stage.starts_with("vectorizing") {
             // 向量化任务：向量化进度用任务的 vectorized_count
+            let idx_pct = if db_total > 0 { (db_indexed as f64 / db_total as f64 * 100.0).min(100.0) } else { 0.0 };
             let vec_pct = if task_total > 0 {
                 (task_vectorized as f64 / task_total as f64 * 100.0).min(100.0)
             } else { 0.0 };
             ("vectorizing".to_string(), scan, db_total as u64, db_indexed as u64, db_vectorized as i64, idx_pct, vec_pct)
         } else {
-            // 索引任务：向量化进度用数据库值
+            // 其他任务（pulling等）
+            let idx_pct = if db_total > 0 { (db_indexed as f64 / db_total as f64 * 100.0).min(100.0) } else { 0.0 };
             let vec_pct = if db_total > 0 { (db_vectorized as f64 / db_total as f64 * 100.0).min(100.0) } else { 0.0 };
             (stage, scan, task_total, task_indexed, db_vectorized, idx_pct, vec_pct)
         }
@@ -1357,6 +1364,14 @@ async fn clear_all_data(
             let _ = std::fs::remove_file(&state_file);
             cleared.push("indexer state cleared".to_string());
         }
+        // 清除 doc_convert 缓存（转换后的.md文件）
+        let doc_convert_dir = std::path::Path::new(&data_dir).join("doc_convert");
+        if doc_convert_dir.exists() {
+            match std::fs::remove_dir_all(&doc_convert_dir) {
+                Ok(_) => cleared.push("doc_convert cache cleared".to_string()),
+                Err(e) => cleared.push(format!("doc_convert cache clear failed: {}", e)),
+            }
+        }
     }
     
     // 清除 artifacts
@@ -1395,17 +1410,29 @@ async fn clear_all_data(
     
     // 清除缓存目录
     if clear_all || req.clear_cache.unwrap_or(false) {
+        // 清除 cache 目录
         let cache_dir = std::path::Path::new(&data_dir).join("cache");
         if cache_dir.exists() {
             match std::fs::remove_dir_all(&cache_dir) {
                 Ok(_) => cleared.push("cache directory cleared".to_string()),
                 Err(e) => cleared.push(format!("cache clear failed: {}", e)),
             }
-        } else {
-            cleared.push("cache directory not found".to_string());
+        }
+
+        // 清除 doc_convert 缓存（转换后的.md文件）
+        let doc_convert_dir = std::path::Path::new(&data_dir).join("doc_convert");
+        if doc_convert_dir.exists() {
+            match std::fs::remove_dir_all(&doc_convert_dir) {
+                Ok(_) => cleared.push("doc_convert cache cleared".to_string()),
+                Err(e) => cleared.push(format!("doc_convert cache clear failed: {}", e)),
+            }
+        }
+
+        if !cache_dir.exists() && !doc_convert_dir.exists() {
+            cleared.push("no cache directories found".to_string());
         }
     }
-    
+
     // 清除 embedding 目录
     if clear_all || req.clear_embeddings.unwrap_or(false) {
         let embedding_dir = std::path::Path::new(&data_dir).join("embeddings");
@@ -1451,6 +1478,113 @@ async fn clear_all_data(
         "cleared": cleared,
         "message": format!("Cleared {} data types", cleared.len())
     }))
+}
+
+/// B12: 重新清洗所有已存储的内容（修复存量数据）
+/// POST /api/knowledge/reclean
+async fn reclean_all(
+    State(db): State<Database>,
+) -> Json<Value> {
+    use crate::services::content_cleaner::ContentCleaner;
+    let cleaner = ContentCleaner::with_defaults();
+
+    // 注册任务
+    let (task_id, cancel_flag, progress) = crate::services::task_registry::register_task(
+        "recleaning",
+        "重新清洗数据"
+    ).await;
+
+    let db_clone = db.clone();
+    let task_id_clone = task_id.clone();
+
+    tokio::spawn(async move {
+        progress.set_stage("cleaning").await;
+
+        // 获取所有文档
+        let docs = sqlx::query_as::<_, (String, String, String, String)>(
+            "SELECT id, type, title, content FROM doc WHERE status = 'active'"
+        )
+        .fetch_all(&db_clone.pool)
+        .await;
+
+        let docs = match docs {
+            Ok(d) => d,
+            Err(e) => {
+                tracing::error!("Failed to fetch docs for reclean: {}", e);
+                crate::services::task_registry::unregister_task(&task_id_clone).await;
+                return;
+            }
+        };
+
+        let total = docs.len() as u64;
+        progress.set_total_files(total);
+
+        let mut cleaned_count = 0;
+        let mut skipped_count = 0;
+
+        for (id, doc_type, title, content) in docs {
+            if cancel_flag.load(std::sync::atomic::Ordering::Relaxed) {
+                break;
+            }
+
+            // 根据类型选择清洗管道
+            let new_content = match doc_type.as_str() {
+                "knowledge" => cleaner.clean_knowledge(&content),
+                "session" => cleaner.clean_session(&content),
+                "memory" => cleaner.clean_memory(&content),
+                _ => {
+                    skipped_count += 1;
+                    progress.inc_indexed_count();
+                    continue;
+                }
+            };
+
+            // 清洗标题（session类型）
+            let new_title = if doc_type == "session" {
+                cleaner.clean_session_title(&title)
+            } else {
+                title.clone()
+            };
+
+            // 只有内容变化时才更新
+            if new_content != content || new_title != title {
+                let result = sqlx::query(
+                    "UPDATE doc SET content = ?, title = ?, updated_at = ? WHERE id = ?"
+                )
+                .bind(&new_content)
+                .bind(&new_title)
+                .bind(chrono::Utc::now().to_rfc3339())
+                .bind(&id)
+                .execute(&db_clone.pool)
+                .await;
+
+                if result.is_ok() {
+                    cleaned_count += 1;
+                }
+            } else {
+                skipped_count += 1;
+            }
+
+            progress.inc_indexed_count();
+        }
+
+        progress.set_stage("done").await;
+        crate::services::task_registry::unregister_task(&task_id_clone).await;
+
+        tracing::info!("Reclean completed: {} cleaned, {} skipped, {} total", cleaned_count, skipped_count, total);
+    });
+
+    Json(json!({
+        "success": true,
+        "message": "重新清洗任务已启动",
+        "task_id": task_id
+    }))
+}
+
+/// GET /api/knowledge/tools — 获取可用工具状态（poppler, tesseract等）
+async fn get_tools_status() -> Json<Value> {
+    let processor = crate::services::pdf_processor::PdfProcessor::with_defaults();
+    Json(processor.tool_status())
 }
 
 /// 计算目录大小

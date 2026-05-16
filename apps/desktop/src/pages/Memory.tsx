@@ -1280,7 +1280,7 @@ export function Memory() {
                 </div>
               </div>
             ) : (
-              <div className="bg-white p-4 rounded-xl border border-gray-100 max-h-[600px] overflow-y-auto shadow-sm">
+              <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
                 <pre className="whitespace-pre-wrap text-sm font-mono leading-relaxed">
                   {selectedMemory.content || t('memory.detail.noContent')}
                 </pre>

@@ -571,6 +571,7 @@ async fn insert_memory_entry(_db: &Database, _entry: &MemoryEntry, _source: &str
 
 /// 插入 Doc 条目到 doc + ext 表 (新 schema)
 /// 使用确定性 ID (基于 source+path+title 的 hash) 以支持 INSERT OR IGNORE 去重
+/// 内容清洗在此处统一执行
 async fn insert_doc_entry(
     db: &Database,
     entry: &MemoryEntry,
@@ -581,11 +582,34 @@ async fn insert_doc_entry(
     platform: Option<&str>,
     message_count: Option<i32>,
 ) -> bool {
+    use crate::services::content_cleaner::ContentCleaner;
+    let cleaner = ContentCleaner::with_defaults();
+
+    // B7: 清洗标题（移除token统计等）
+    let cleaned_title = if record_type == "session" {
+        cleaner.clean_session_title(&entry.title)
+    } else {
+        entry.title.clone()
+    };
+
+    // 根据类型执行不同的清洗管道
+    let cleaned_content = match record_type {
+        "session" => {
+            // B8: 丢弃空session
+            if cleaner.is_empty_session(&entry.content) {
+                return false;
+            }
+            cleaner.clean_session(&entry.content)
+        }
+        "memory" => cleaner.clean_memory(&entry.content),
+        _ => entry.content.clone(),
+    };
+
     // Use full source_type (keep _session suffix for search compatibility)
     let source_type = source.to_string();
 
     // Generate deterministic ID from key to avoid duplicates on re-pull
-    let key = format!("{}:{}:{}", source_type, file_path, entry.title);
+    let key = format!("{}:{}:{}", source_type, file_path, cleaned_title);
     let id = {
         use sha2::{Sha256, Digest};
         let mut hasher = Sha256::new();
@@ -600,7 +624,7 @@ async fn insert_doc_entry(
     let content_hash = {
         use std::hash::{Hash, Hasher};
         let mut h = std::collections::hash_map::DefaultHasher::new();
-        entry.content.hash(&mut h);
+        cleaned_content.hash(&mut h);
         format!("{:016x}", h.finish())
     };
 
@@ -612,8 +636,8 @@ async fn insert_doc_entry(
         )
         .bind(&id)
         .bind(record_type)
-        .bind(&entry.title)
-        .bind(&entry.content)
+        .bind(&cleaned_title)
+        .bind(&cleaned_content)
         .bind(&content_hash)
         .bind(&source_type)
         .bind(file_path)
@@ -629,8 +653,8 @@ async fn insert_doc_entry(
         )
         .bind(&id)
         .bind(record_type)
-        .bind(&entry.title)
-        .bind(&entry.content)
+        .bind(&cleaned_title)
+        .bind(&cleaned_content)
         .bind(&content_hash)
         .bind(&source_type)
         .bind(file_path)

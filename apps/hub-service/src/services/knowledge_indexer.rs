@@ -202,6 +202,15 @@ impl KnowledgeIndexer {
         
         // 读取内容
         let content = tokio::fs::read_to_string(&read_path).await.ok()?;
+
+        // B11: 超小文件检查 — <50B的内容标记为空
+        let cleaner = crate::services::content_cleaner::ContentCleaner::with_defaults();
+        if cleaner.is_tiny(&content) {
+            tracing::info!("Skipping tiny file ({}B): {}", content.trim().len(), path_str);
+            // 仍然记录文件存在，但标记为空状态
+            // 这样不会丢失文件信息，只是不参与搜索
+        }
+
         let hash = self.calculate_hash(&content);
         
         // 检查是否有变化
