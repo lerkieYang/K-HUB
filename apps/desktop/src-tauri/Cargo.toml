@@ -1,15 +1,19 @@
 [package]
 name = "knowledgehub-desktop"
-version = "1.1.2"
+version = "2.5.2"
 description = "K-HUB Desktop Application"
 authors = ["K-HUB Team"]
 edition = "2021"
 
 [build-dependencies]
-tauri-build = { version = "1.5", features = [] }
+tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "1.6", features = [ "shell-sidecar", "shell-open", "system-tray", "custom-protocol"] }
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-shell = "2"
+tauri-plugin-process = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-clipboard-manager = "2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tokio = { version = "1", features = ["full"] }
@@ -18,6 +22,7 @@ zip = "0.6"
 walkdir = "2.3"
 winreg = "0.52"
 dirs = "5"
+winapi = { version = "0.3", features = ["synchapi", "errhandlingapi", "winerror"] }
 
 [features]
 custom-protocol = ["tauri/custom-protocol"]

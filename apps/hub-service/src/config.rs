@@ -55,7 +55,7 @@ impl Config {
         
         Ok(Self {
             database_url: std::env::var("DATABASE_URL")
-                .unwrap_or_else(|_| format!("sqlite:{}/knowledge-hub.db", data_dir)),
+                .unwrap_or_else(|_| format!("sqlite:{}/khub.db", data_dir)),
             data_dir: data_dir.clone(),
             embedding_dir: std::env::var("KH_EMBEDDING_DIR")
                 .ok()

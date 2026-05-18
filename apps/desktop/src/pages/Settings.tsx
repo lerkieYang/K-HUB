@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useAppStore, getBackendUrl } from '../stores/appStore';
 import { useI18n } from '../i18n';
 import { useToast } from '../components/Toast';
-import { invoke } from '@tauri-apps/api/tauri';
+import { invoke } from '@tauri-apps/api/core';
 
 interface KnowledgeBaseConfig {
   id: string;
@@ -1654,7 +1654,7 @@ export function Settings() {
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between py-2 border-b">
                   <span className="text-gray-500">{t('settings.about.version')}</span>
-                  <span className="font-mono">'1.1.0'</span>
+                  <span className="font-mono">2.5.2</span>
                 </div>
                 <div className="flex justify-between py-2 border-b">
                   <span className="text-gray-500">{t('settings.about.platform')}</span>
@@ -1662,7 +1662,7 @@ export function Settings() {
                 </div>
                 <div className="flex justify-between py-2 border-b">
                   <span className="text-gray-500">{t('settings.about.electron')}</span>
-                  <span className="font-mono">{window.__TAURI__ ? 'Tauri' : 'Browser'}</span>
+                  <span className="font-mono">{(window as any).__TAURI_INTERNALS__ ? 'Tauri v2' : 'Browser'}</span>
                 </div>
               </div>
             </div>

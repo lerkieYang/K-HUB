@@ -1,56 +1,47 @@
 {
+  "productName": "K-HUB",
+  "version": "2.5.2",
+  "identifier": "com.knowledgehub.desktop",
   "build": {
     "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "npm run build",
-    "devPath": "http://localhost:1420",
-    "distDir": "../dist"
+    "devUrl": "http://localhost:1420",
+    "frontendDist": "../dist"
   },
-  "package": {
-    "productName": "K-HUB",
-    "version": "2.2.0"
-  },
-  "tauri": {
-    "allowlist": {
-      "all": false,
-      "shell": {
-        "open": true,
-        "sidecar": true
-      }
-    },
-    "bundle": {
-      "active": true,
-      "identifier": "com.knowledgehub.desktop",
-      "icon": [
-        "icons/icon.ico"
-      ],
-      "resources": [
-        "hub-service.exe",
-        "resources/tesseract/**/*",
-        "resources/poppler/**/*"
-      ],
-      "targets": ["nsis", "msi"],
-      "windows": {
-        "nsis": {
-          "installMode": "currentUser",
-          "displayLanguageSelector": false
-        }
-      }
-    },
-    "security": {
-      "csp": null
-    },
+  "app": {
     "windows": [
       {
         "title": "K-HUB",
         "width": 1200,
         "height": 800,
-        "resizable": true,
-        "fullscreen": false
+        "resizable": true
       }
     ],
-    "systemTray": {
+    "trayIcon": {
       "iconPath": "icons/icon.ico",
       "iconAsTemplate": true
+    },
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "icon": [
+      "icons/icon.ico"
+    ],
+    "resources": [
+      "hub-service.exe",
+      "resources/tesseract/**/*",
+      "resources/poppler/**/*"
+    ],
+    "targets": ["nsis", "msi"],
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "displayLanguageSelector": false,
+        "installerHooks": "nsis/installer-hooks.nsh"
+      }
     }
   }
 }

@@ -40,6 +40,9 @@ config.local.json
 tmp/
 temp/
 
+# Tauri auto-generated
+apps/desktop/src-tauri/gen/
+
 # Debug/test scripts (development only)
 *.ps1
 apps/hub-service/check_*.py
@@ -56,3 +59,8 @@ apps/desktop/public/*.png
 build.bat
 apps/desktop/src-tauri/resources/tesseract/
 apps/desktop/src-tauri/resources/poppler/
+build-all.bat
+
+# Personal/dev docs with internal paths
+Knowledge_Hub_Desktop_*.md
+MEMORY_PAGE_FIX.md

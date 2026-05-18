@@ -1,7 +1,8 @@
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::sync::{mpsc, Mutex};
 use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 
@@ -21,6 +22,35 @@ const SUPPORTED_EXTENSIONS: &[&str] = &[
 
 /// Debounce window in seconds
 const DEBOUNCE_SECS: u64 = 5;
+
+/// Cooldown after indexing completes (seconds) — prevents file watcher from
+/// immediately re-triggering indexing due to background file events.
+const POST_INDEX_COOLDOWN_SECS: u64 = 120;
+
+/// Global timestamp (epoch seconds) of the last indexing completion.
+/// Set by `run_indexing_task` when it finishes; checked by file watcher.
+static LAST_INDEXING_COMPLETED: AtomicU64 = AtomicU64::new(0);
+
+/// Call this from the indexing task when it completes.
+pub fn notify_indexing_completed() {
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    LAST_INDEXING_COMPLETED.store(now, Ordering::Relaxed);
+    tracing::info!("File watcher: indexing completion recorded, cooldown {}s", POST_INDEX_COOLDOWN_SECS);
+}
+
+/// Check if we're still within the post-indexing cooldown window.
+fn is_in_cooldown() -> bool {
+    let completed = LAST_INDEXING_COMPLETED.load(Ordering::Relaxed);
+    if completed == 0 { return false; }
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    now.saturating_sub(completed) < POST_INDEX_COOLDOWN_SECS
+}
 
 /// Simplified file event for cross-thread communication
 #[derive(Debug, Clone)]
@@ -317,6 +347,16 @@ impl FileWatcher {
                     );
                     continue;
                 }
+            }
+
+            // Post-indexing cooldown — skip events right after indexing completes
+            if is_in_cooldown() {
+                tracing::debug!(
+                    "Post-index cooldown active ({}s), skipping file change: {}",
+                    POST_INDEX_COOLDOWN_SECS,
+                    path.display()
+                );
+                continue;
             }
 
             // Queue reindex for the affected config

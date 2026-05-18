@@ -3,6 +3,11 @@
 
 use std::path::Path;
 use std::process::Command;
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
+#[cfg(target_os = "windows")]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 /// PDF处理配置
 #[derive(Debug, Clone)]
@@ -57,21 +62,22 @@ impl PdfProcessor {
         let clean_text = self.clean_pdf_text(&text);
         let char_count = clean_text.chars().filter(|c| !c.is_whitespace()).count();
 
-        if char_count >= self.config.ocr_threshold {
-            // 文字足够，直接返回
+        // 检查是否为可读文本（不是二进制垃圾）
+        if char_count >= self.config.ocr_threshold && self.is_readable_text(&clean_text) {
+            // 文字足够且可读，直接返回
             return Ok(clean_text);
         }
 
-        // 步骤3: 文字不足，尝试 pdf-extract 作为备选
+        // 步骤3: 文字不足或不可读，尝试 pdf-extract 作为备选
         let fallback_text = self.extract_with_pdf_extract(&bytes);
         let fallback_clean = self.clean_pdf_text(&fallback_text);
         let fallback_count = fallback_clean.chars().filter(|c| !c.is_whitespace()).count();
 
-        if fallback_count >= self.config.ocr_threshold {
+        if fallback_count >= self.config.ocr_threshold && self.is_readable_text(&fallback_clean) {
             return Ok(fallback_clean);
         }
 
-        // 步骤4: 两个提取器都不够，尝试OCR
+        // 步骤4: 两个提取器都不够或不可读，尝试OCR
         if self.config.ocr_enabled {
             match self.extract_with_ocr(path) {
                 Ok(ocr_text) if !ocr_text.trim().is_empty() => {
@@ -85,13 +91,71 @@ impl PdfProcessor {
         }
 
         // 步骤5: 所有方法都失败，返回最好的结果
-        if fallback_count > char_count {
+        if fallback_count > char_count && self.is_readable_text(&fallback_clean) {
             Ok(fallback_clean)
-        } else if !clean_text.trim().is_empty() {
+        } else if !clean_text.trim().is_empty() && self.is_readable_text(&clean_text) {
             Ok(clean_text)
         } else {
             Err("No readable text found in PDF (tried poppler, pdf-extract, OCR)".to_string())
         }
+    }
+
+    /// 检查文本是否可读（不是二进制垃圾）
+    fn is_readable_text(&self, text: &str) -> bool {
+        if text.is_empty() {
+            return false;
+        }
+
+        // 检查是否包含明显的二进制/图片标记
+        let binary_markers = [
+            "cHRM", "IDAT", "IHDR", "PLTE", "gAMA", "sRGB",
+            "JFIF", "Exif", "ICC_PROFILE", "GIF89", "GIF87",
+            "RIFF", "WEBP", "tEXtSoftware",
+            "[Content_Types]", "_rels/", "theme/",
+            "MSWordDoc", "Word.Document", "KSOProductBuildVer",
+        ];
+
+        for marker in &binary_markers {
+            if text.contains(marker) {
+                return false;
+            }
+        }
+
+        let chars: Vec<char> = text.chars().collect();
+        let total = chars.len();
+
+        // 统计CJK字符（中文文档的核心内容）
+        let cjk_count = chars.iter().filter(|&&c| {
+            (c >= '\u{4E00}' && c <= '\u{9FFF}') || // CJK统一汉字
+            (c >= '\u{3400}' && c <= '\u{4DBF}')    // CJK扩展A
+        }).count();
+
+        // 如果有CJK字符，认为是可读的（中文文档）
+        if cjk_count > 10 {
+            return true;
+        }
+
+        // 统计连续字母序列（单词）
+        let mut word_count = 0;
+        let mut in_word = false;
+        for &c in &chars {
+            if c.is_ascii_alphabetic() {
+                if !in_word {
+                    word_count += 1;
+                    in_word = true;
+                }
+            } else {
+                in_word = false;
+            }
+        }
+
+        // 如果有超过5个单词，认为是可读的（英文文档）
+        if word_count > 5 {
+            return true;
+        }
+
+        // 否则认为是二进制垃圾
+        false
     }
 
     /// 使用 poppler (pdftotext) 提取文本
@@ -104,6 +168,7 @@ impl PdfProcessor {
             .arg("UTF-8")
             .arg(path)
             .arg("-")  // 输出到stdout
+            .creation_flags(CREATE_NO_WINDOW)
             .output()
             .map_err(|e| format!("pdftotext failed: {}", e))?;
 
@@ -140,6 +205,7 @@ impl PdfProcessor {
             .arg("300")  // 300 DPI
             .arg(path)
             .arg(&output_prefix)
+            .creation_flags(CREATE_NO_WINDOW)
             .status()
             .map_err(|e| format!("pdftoppm failed: {}", e))?;
 
@@ -173,7 +239,8 @@ impl PdfProcessor {
                 .arg("-l")
                 .arg(&self.config.ocr_lang)
                 .arg("--psm")
-                .arg("6");  // 假设为统一的文本块
+                .arg("6")  // 假设为统一的文本块
+                .creation_flags(CREATE_NO_WINDOW);
 
             // 设置 TESSDATA_PREFIX
             if let Some(ref prefix) = tessdata_prefix {
@@ -295,7 +362,7 @@ impl PdfProcessor {
         candidates.push(format!(r"{}\Microsoft\WinGet\Packages\oschwartz10612.Poppler_Microsoft.Winget.Source_8wekyb3d8bbwe\poppler-25.07.0\Library\bin\pdftotext.exe", local_app_data));
 
         for candidate in &candidates {
-            if !candidate.is_empty() && Command::new(candidate).arg("-v").output().is_ok() {
+            if !candidate.is_empty() && Command::new(candidate).arg("-v").creation_flags(CREATE_NO_WINDOW).output().is_ok() {
                 return Ok(candidate.clone());
             }
         }
@@ -321,7 +388,7 @@ impl PdfProcessor {
         candidates.push(format!(r"{}\Microsoft\WinGet\Packages\oschwartz10612.Poppler_Microsoft.Winget.Source_8wekyb3d8bbwe\poppler-25.07.0\Library\bin\pdftoppm.exe", local_app_data));
 
         for candidate in &candidates {
-            if !candidate.is_empty() && Command::new(candidate).arg("-v").output().is_ok() {
+            if !candidate.is_empty() && Command::new(candidate).arg("-v").creation_flags(CREATE_NO_WINDOW).output().is_ok() {
                 return Ok(candidate.clone());
             }
         }
@@ -349,7 +416,7 @@ impl PdfProcessor {
         candidates.push(r"C:\Program Files\Tesseract-OCR\tesseract.exe".to_string());
 
         for candidate in &candidates {
-            if !candidate.is_empty() && Command::new(candidate).arg("--version").output().is_ok() {
+            if !candidate.is_empty() && Command::new(candidate).arg("--version").creation_flags(CREATE_NO_WINDOW).output().is_ok() {
                 return Ok(candidate.clone());
             }
         }

@@ -640,6 +640,7 @@ async fn run_indexing_task(
     }
 
     progress.set_stage("done").await;
+    crate::services::file_watcher::notify_indexing_completed();
     tracing::info!("Reindex done: {} inserted, {} updated, {} skipped, {} deleted (task {})", inserted, updated, skipped, deleted_count, task_id);
 }
 
@@ -1138,9 +1139,13 @@ async fn data_stats(
     let cache_size = dir_size(&cache_dir);
     let embedding_size = dir_size(&embedding_dir);
     
-    // DB 文件大小
-    let db_path = std::path::Path::new(&data_dir).join("knowledge-hub.db");
-    let db_size = std::fs::metadata(&db_path).map(|m| m.len()).unwrap_or(0);
+    // DB 文件大小 — 兼容新旧文件名
+    let db_path_new = std::path::Path::new(&data_dir).join("khub.db");
+    let db_path_old = std::path::Path::new(&data_dir).join("knowledge-hub.db");
+    let db_size = std::fs::metadata(&db_path_new)
+        .or_else(|_| std::fs::metadata(&db_path_old))
+        .map(|m| m.len())
+        .unwrap_or(0);
     
     // 旧版本数 = archived 状态的记录
     let all_archived: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM doc WHERE status = 'archived'")

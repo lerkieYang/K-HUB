@@ -24,9 +24,16 @@ async fn main() -> anyhow::Result<()> {
                 .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"))
         )
         .init();
-    
+
     let config = config::Config::from_env()?;
     let db = db::Database::new(&config).await?;
+
+    // 启动时检查并下载 Tesseract 中文语言包（后台执行，不阻塞启动）
+    tokio::spawn(async {
+        if let Err(e) = ensure_tesseract_langpack().await {
+            tracing::warn!("Tesseract language pack check failed: {}", e);
+        }
+    });
 
     // 启动文件系统监控 — 自动在文件变化时触发重新索引
     let mut file_watcher = services::file_watcher::FileWatcher::new(db.clone());
@@ -190,6 +197,80 @@ async fn auth_middleware(
     }
     
     Ok(next.run(req).await)
+}
+
+/// 检查并下载 Tesseract 中文语言包
+/// 如果 Tesseract 已安装但缺少中文语言包，自动下载
+async fn ensure_tesseract_langpack() -> Result<(), String> {
+    // 查找 Tesseract 安装路径
+    let tesseract_dir = find_tesseract_dir()?;
+    let tessdata_dir = tesseract_dir.join("tessdata");
+
+    // 检查是否已有中文语言包
+    let chi_sim = tessdata_dir.join("chi_sim.traineddata");
+    if chi_sim.exists() {
+        return Ok(()); // 已有，不需要下载
+    }
+
+    // 检查 tessdata 目录是否存在
+    if !tessdata_dir.exists() {
+        return Err("tessdata directory not found".to_string());
+    }
+
+    tracing::info!("Tesseract Chinese language pack not found, downloading...");
+
+    // 下载中文语言包
+    let url = "https://github.com/tesseract-ocr/tessdata/raw/main/chi_sim.traineddata";
+    let client = reqwest::Client::new();
+    let response = client.get(url)
+        .timeout(std::time::Duration::from_secs(300))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to download: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!("Download failed: HTTP {}", response.status()));
+    }
+
+    let bytes = response.bytes().await
+        .map_err(|e| format!("Failed to read response: {}", e))?;
+
+    // 写入文件
+    tokio::fs::write(&chi_sim, &bytes).await
+        .map_err(|e| format!("Failed to write file: {}", e))?;
+
+    tracing::info!("Tesseract Chinese language pack downloaded successfully ({} bytes)", bytes.len());
+
+    Ok(())
+}
+
+/// 查找 Tesseract 安装目录
+fn find_tesseract_dir() -> Result<std::path::PathBuf, String> {
+    // 优先：应用目录内的 tesseract
+    if let Ok(exe_path) = std::env::current_exe() {
+        if let Some(exe_dir) = exe_path.parent() {
+            let bundled = exe_dir.join("resources").join("tesseract");
+            if bundled.exists() {
+                return Ok(bundled);
+            }
+        }
+    }
+
+    // 其次：用户本地目录
+    if let Ok(local_app_data) = std::env::var("LOCALAPPDATA") {
+        let local_path = std::path::Path::new(&local_app_data).join("Tesseract-OCR");
+        if local_path.exists() {
+            return Ok(local_path);
+        }
+    }
+
+    // 最后：Program Files
+    let program_files = std::path::Path::new(r"C:\Program Files\Tesseract-OCR");
+    if program_files.exists() {
+        return Ok(program_files.to_path_buf());
+    }
+
+    Err("Tesseract not found".to_string())
 }
 
 

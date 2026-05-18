@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAppStore, getBackendUrl } from '../stores/appStore';
 import { useI18n } from '../i18n';
 import { useToast } from '../components/Toast';
-import { open } from '@tauri-apps/api/shell';
+import { open } from '@tauri-apps/plugin-shell';
 
 // Memory类型定义 - matches actual API response from GET /api/memory
 interface Memory {

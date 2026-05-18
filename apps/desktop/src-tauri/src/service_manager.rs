@@ -1,7 +1,10 @@
 use std::collections::HashMap;
 use std::sync::Mutex;
 use std::process::{Command, Child};
+use std::os::windows::process::CommandExt;
 use serde::{Deserialize, Serialize};
+
+const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum AppMode {
@@ -77,9 +80,10 @@ impl ServiceManager {
     ) -> Result<(), String> {
         // 1. 启动Hub Service (SQLite模式)
         let hub_service = Command::new("hub-service.exe")
-            .env("DATABASE_URL", format!("sqlite:{}/knowledge-hub.db", config.data_dir))
+            .env("DATABASE_URL", format!("sqlite:{}/khub.db", config.data_dir))
+            .env("KH_DATA_DIR", &config.data_dir)
             .env("KH_MODE", "standalone")
-            .spawn()
+            .creation_flags(CREATE_NO_WINDOW).spawn()
             .map_err(|e| format!("Failed to start hub-service: {}", e))?;
         processes.insert("hub-service".to_string(), hub_service);
         running.insert("hub-service".to_string(), true);
@@ -87,7 +91,7 @@ impl ServiceManager {
         // 2. 启动MCP Server
         let mcp_server = Command::new("mcp-server.exe")
             .env("KH_HUB_URL", "http://127.0.0.1:8443")
-            .spawn()
+            .creation_flags(CREATE_NO_WINDOW).spawn()
             .map_err(|e| format!("Failed to start mcp-server: {}", e))?;
         processes.insert("mcp-server".to_string(), mcp_server);
         running.insert("mcp-server".to_string(), true);
@@ -95,7 +99,7 @@ impl ServiceManager {
         // 3. 启动Collector
         let collector = Command::new("collector.exe")
             .env("KH_HUB_URL", "http://127.0.0.1:8443")
-            .spawn()
+            .creation_flags(CREATE_NO_WINDOW).spawn()
             .map_err(|e| format!("Failed to start collector: {}", e))?;
         processes.insert("collector".to_string(), collector);
         running.insert("collector".to_string(), true);
@@ -114,7 +118,7 @@ impl ServiceManager {
         let hub_service = Command::new("hub-service.exe")
             .env("DATABASE_URL", "postgres://localhost/knowledge_hub")
             .env("KH_MODE", "hub")
-            .spawn()
+            .creation_flags(CREATE_NO_WINDOW).spawn()
             .map_err(|e| format!("Failed to start hub-service: {}", e))?;
         processes.insert("hub-service".to_string(), hub_service);
         running.insert("hub-service".to_string(), true);
@@ -122,7 +126,7 @@ impl ServiceManager {
         // 2. 启动MCP Server
         let mcp_server = Command::new("mcp-server.exe")
             .env("KH_HUB_URL", "http://127.0.0.1:8443")
-            .spawn()
+            .creation_flags(CREATE_NO_WINDOW).spawn()
             .map_err(|e| format!("Failed to start mcp-server: {}", e))?;
         processes.insert("mcp-server".to_string(), mcp_server);
         running.insert("mcp-server".to_string(), true);
@@ -130,7 +134,7 @@ impl ServiceManager {
         // 3. 启动Collector
         let collector = Command::new("collector.exe")
             .env("KH_HUB_URL", "http://127.0.0.1:8443")
-            .spawn()
+            .creation_flags(CREATE_NO_WINDOW).spawn()
             .map_err(|e| format!("Failed to start collector: {}", e))?;
         processes.insert("collector".to_string(), collector);
         running.insert("collector".to_string(), true);
@@ -154,7 +158,7 @@ impl ServiceManager {
         let mcp_server = Command::new("mcp-server.exe")
             .env("KH_HUB_URL", hub_url)
             .env("KH_PROXY_MODE", "true")
-            .spawn()
+            .creation_flags(CREATE_NO_WINDOW).spawn()
             .map_err(|e| format!("Failed to start mcp-proxy: {}", e))?;
         processes.insert("mcp-server".to_string(), mcp_server);
         running.insert("mcp-server".to_string(), true);
@@ -162,7 +166,7 @@ impl ServiceManager {
         // 2. 启动Collector (连接到远程Hub)
         let collector = Command::new("collector.exe")
             .env("KH_HUB_URL", hub_url)
-            .spawn()
+            .creation_flags(CREATE_NO_WINDOW).spawn()
             .map_err(|e| format!("Failed to start collector: {}", e))?;
         processes.insert("collector".to_string(), collector);
         running.insert("collector".to_string(), true);

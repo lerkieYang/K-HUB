@@ -4,7 +4,9 @@ mod service_manager;
 
 use service_manager::{ServiceManager, AppMode, ModeConfig};
 use std::sync::Mutex;
-use tauri::{State, Manager, SystemTray, SystemTrayEvent, SystemTrayMenu, CustomMenuItem};
+use tauri::{State, Manager};
+use tauri::menu::{MenuBuilder, MenuItemBuilder};
+use tauri::tray::TrayIconEvent;
 use std::path::PathBuf;
 use chrono::Local;
 use std::fs;
@@ -13,6 +15,8 @@ use zip::write::FileOptions;
 use zip::ZipWriter;
 use std::io::Write;
 use std::process::{Command, Child};
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
 
 struct AppState {
     config: Mutex<ModeConfig>,
@@ -416,7 +420,7 @@ fn save_settings_to_file(state: &State<AppState>) -> Result<(), String> {
 
 fn start_hub_service(app_handle: &tauri::AppHandle) -> Option<Child> {
     // 获取 sidecar 路径
-    let resource_dir = app_handle.path_resolver().resource_dir().unwrap_or_default();
+    let resource_dir = app_handle.path().resource_dir().unwrap_or_default();
     let sidecar_path = resource_dir.join("hub-service.exe");
     
     // 如果 sidecar 不存在，尝试从当前目录查找
@@ -434,10 +438,12 @@ fn start_hub_service(app_handle: &tauri::AppHandle) -> Option<Child> {
     }
     
     // 启动 hub-service
+    let kh_data_dir = dirs::data_dir().unwrap_or_default().join("KnowledgeHub").to_string_lossy().to_string();
     match Command::new(&exe_path)
-        .env("DATABASE_URL", format!("sqlite:{}/khub.db", 
-            dirs::data_dir().unwrap_or_default().join("KnowledgeHub").to_string_lossy()))
+        .env("DATABASE_URL", format!("sqlite:{}/khub.db", &kh_data_dir))
+        .env("KH_DATA_DIR", &kh_data_dir)
         .env("KH_MODE", "standalone")
+        .creation_flags(0x08000000)  // CREATE_NO_WINDOW
         .spawn() 
     {
         Ok(child) => {
@@ -452,6 +458,27 @@ fn start_hub_service(app_handle: &tauri::AppHandle) -> Option<Child> {
 }
 
 fn main() {
+    // 单实例检查：使用 Windows Mutex 防止多开
+    #[cfg(target_os = "windows")]
+    {
+        use std::ffi::CString;
+        use winapi::um::synchapi::CreateMutexA;
+        use winapi::um::errhandlingapi::GetLastError;
+        use winapi::shared::winerror::ERROR_ALREADY_EXISTS;
+
+        let mutex_name = CString::new("K-HUB-Single-Instance-Mutex").unwrap();
+        unsafe {
+            let handle = CreateMutexA(std::ptr::null_mut(), 1, mutex_name.as_ptr());
+            if handle.is_null() {
+                // 创建失败，继续启动
+            } else if GetLastError() == ERROR_ALREADY_EXISTS {
+                // 已有实例在运行，直接退出
+                eprintln!("K-HUB is already running. Exiting.");
+                std::process::exit(0);
+            }
+        }
+    }
+
     let data_dir = dirs::data_dir()
         .unwrap_or_default()
         .join("KnowledgeHub")
@@ -463,22 +490,31 @@ fn main() {
 
     let persisted = load_settings_from_file();
 
-    let tray_menu = SystemTrayMenu::new()
-        .add_item(CustomMenuItem::new("show", "显示窗口"))
-        .add_item(CustomMenuItem::new("quit", "退出"));
-
-    let system_tray = SystemTray::new().with_menu(tray_menu);
-
     tauri::Builder::default()
-        .system_tray(system_tray)
-        .on_system_tray_event(|app, event| {
-            match event {
-                SystemTrayEvent::MenuItemClick { id, .. } => {
-                    match id.as_str() {
+        .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
+        .setup(|app| {
+            // 创建托盘菜单
+            let show_item = MenuItemBuilder::with_id("show", "显示窗口").build(app)?;
+            let quit_item = MenuItemBuilder::with_id("quit", "退出").build(app)?;
+            let menu = MenuBuilder::new(app)
+                .item(&show_item)
+                .item(&quit_item)
+                .build()?;
+            
+            // 创建托盘图标
+            let _tray = tauri::tray::TrayIconBuilder::new()
+                .icon(app.default_window_icon().unwrap().clone())
+                .menu(&menu)
+                .on_menu_event(move |app, event| {
+                    match event.id().as_ref() {
                         "show" => {
-                            let window = app.get_window("main").unwrap();
-                            window.show().unwrap();
-                            window.set_focus().unwrap();
+                            if let Some(window) = app.get_webview_window("main") {
+                                let _ = window.show();
+                                let _ = window.set_focus();
+                            }
                         }
                         "quit" => {
                             // 停止 hub-service
@@ -491,31 +527,18 @@ fn main() {
                         }
                         _ => {}
                     }
-                }
-                SystemTrayEvent::LeftClick { .. } => {
-                    let window = app.get_window("main").unwrap();
-                    window.show().unwrap();
-                    window.set_focus().unwrap();
-                }
-                _ => {}
-            }
-        })
-        .on_window_event(|event| {
-            match event.event() {
-                tauri::WindowEvent::CloseRequested { api, .. } => {
-                    let app_handle = event.window().app_handle();
-                    let state: State<AppState> = app_handle.state();
-                    let minimize_to_tray = *state.minimize_to_tray.lock().unwrap();
-                    
-                    if minimize_to_tray {
-                        event.window().hide().unwrap();
-                        api.prevent_close();
+                })
+                .on_tray_icon_event(|tray, event| {
+                    if let TrayIconEvent::Click { .. } = event {
+                        let app = tray.app_handle();
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
                     }
-                }
-                _ => {}
-            }
-        })
-        .setup(|app| {
+                })
+                .build(app)?;
+            
             // 启动 hub-service
             let child = start_hub_service(&app.handle());
             
@@ -525,6 +548,24 @@ fn main() {
             *process = child;
             
             Ok(())
+        })
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                let app_handle = window.app_handle();
+                let state: State<AppState> = app_handle.state();
+                let minimize_to_tray = *state.minimize_to_tray.lock().unwrap();
+                
+                if minimize_to_tray {
+                    let _ = window.hide();
+                    api.prevent_close();
+                } else {
+                    // 真正关闭时，杀掉 hub-service 进程
+                    let mut process = state.hub_process.lock().unwrap();
+                    if let Some(mut child) = process.take() {
+                        child.kill().ok();
+                    }
+                }
+            }
         })
         .manage(AppState {
             config: Mutex::new(ModeConfig {
